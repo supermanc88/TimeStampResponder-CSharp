@@ -11,8 +11,11 @@ namespace Demo
     
     class Program
     {
-        static TSResponder tsResponder;
+        static TSResponder tsResponderSHA1;
+        static TSResponder tsResponderSHA256;
         static readonly string TSAPath = @"/TSA/";
+        private static readonly string SHA1Path = @"SHA1/";
+        private static readonly string SHA256Path = @"SHA256/";
         static void Main(string[] args)
         {
             PrintDesc();
@@ -20,7 +23,8 @@ namespace Demo
             Console.Clear();
             try
             {
-                tsResponder = new TSResponder(File.ReadAllBytes("TSA.crt"), File.ReadAllBytes("TSA.key"), "SHA1");
+                tsResponderSHA1 = new TSResponder(File.ReadAllBytes("TSA.crt"), File.ReadAllBytes("TSA.key"), "SHA1");
+                tsResponderSHA256 = new TSResponder(File.ReadAllBytes("TSA256.crt"), File.ReadAllBytes("TSA256.key"), "SHA256");
             }
             catch
             {
@@ -34,7 +38,7 @@ namespace Demo
             {
                 listener.AuthenticationSchemes = AuthenticationSchemes.Anonymous;
                 listener.Prefixes.Add(@"http://localhost" + TSAPath);
-                listener.Prefixes.Add(@"https://localhost" + TSAPath);
+                // listener.Prefixes.Add(@"https://localhost" + TSAPath);
                 listener.Start();
             }
             catch
@@ -74,6 +78,8 @@ namespace Demo
             HttpListenerContext ctx = (HttpListenerContext)o;
             ctx.Response.StatusCode = 200;
 
+            TSResponder tsResponder;
+
             HttpListenerRequest request = ctx.Request;
             HttpListenerResponse response = ctx.Response;
             if (ctx.Request.HttpMethod != "POST")
@@ -86,7 +92,24 @@ namespace Demo
             else
             {
                 string log = "";
-                string date = request.RawUrl.Remove(0, TSAPath.Length);
+                string date = "";
+                    string hashAndData = request.RawUrl.Remove(0, TSAPath.Length);
+
+                if (hashAndData.StartsWith(SHA1Path))
+                {
+                    tsResponder = tsResponderSHA1;
+                    date = hashAndData.Remove(0, SHA1Path.Length);
+                }
+                else if (hashAndData.StartsWith(SHA256Path))
+                {
+                    tsResponder = tsResponderSHA256;
+                    date = hashAndData.Remove(0, SHA256Path.Length);
+                }
+                else
+                {
+                    return;
+                }
+
                 DateTime signTime;
                 if (!DateTime.TryParseExact(date, "yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out signTime))
                     signTime = DateTime.UtcNow;
